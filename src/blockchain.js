@@ -1,17 +1,24 @@
 const SHA256 = require('crypto-js/sha256');
 
+class Transaction {
+  constructor(fromAddress, toAddress, amount) {
+    this.fromAddress = fromAddress;
+    this.toAddress = toAddress;
+    this.amount = amount;
+  }
+}
+
 class Block {
-  constructor(index, timestamp, data, previousHash = '') {
-    this.index = index;
+  constructor(timestamp, transactions, previousHash = '') {
     this.timestamp = timestamp;
-    this.data = data;
+    this.transactions = transactions;
     this.previousHash = previousHash;
     this.hash = this.calculateHash();
     this.nonce = 0;
   }
 
   calculateHash() {
-    return SHA256(this.previousHash + this.timestamp + JSON.stringify(this.data) + this.nonce).toString();
+    return SHA256(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.nonce).toString();
   }
 
   mineBlock(difficulty) {
@@ -34,6 +41,8 @@ class BlockChain {
   constructor() {
     this.chain = [this.createGenesisBlock()];
     this.difficulty = 4;
+    this.pendingTransactions = [];
+    this.miningReward = 100;
   }
 
   createGenesisBlock() {
@@ -44,10 +53,31 @@ class BlockChain {
     return this.chain[this.chain.length - 1];
   }
 
-  addBlock(newBlock) {
-    newBlock.previousHash = this.getLatestBlock().hash;
-    newBlock.mineBlock(this.difficulty)
-    this.chain.push(newBlock);
+  minePendingTransactions(miningRewardAddress) {
+    let block = new Block(Date.now(), this.pendingTransactions, this.getLatestBlock().hash);
+    block.mineBlock(this.difficulty);
+    this.chain.push(block);
+
+    this.pendingTransactions = [new Transaction(null, miningRewardAddress, this.miningReward)];
+  }
+
+  createTransaction(transaction) {
+    this.pendingTransactions.push(transaction);
+  }
+
+  getBalanceOfAddress(address) {
+    let balance = 0;
+    for (const block of this.chain) {
+      for (const transaction of block.transactions) {
+        if (transaction.fromAddress == address) {
+          balance -= transaction.amount;
+        }
+        if (transaction.toAddress == address) {
+          balance += transaction.amount;
+        }
+      }
+    }
+    return balance;
   }
 
   isChainValid() {
@@ -67,9 +97,4 @@ class BlockChain {
   }
 }
 
-let myNewCoin = new BlockChain();
-
-console.log('Mining Block 1...');
-myNewCoin.addBlock(new Block(new Date(), { amount: 4 }));
-console.log('Mining Block 2...');
-myNewCoin.addBlock(new Block(new Date(), { amount: 10 }));
+module.exports = { Transaction, BlockChain }
